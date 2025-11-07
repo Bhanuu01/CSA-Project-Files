@@ -1,26 +1,45 @@
+import argparse
+from dataclasses import dataclass
 from pathlib import Path
-
-from tap import Tap
+from typing import Optional
 
 from constants import NETID
 
 
-class Args(Tap):
+@dataclass
+class Args:
+    """Typed container for CLI parameters.
+
+    Public attributes must remain the same for compatibility with callers.
+    """
     debug: bool = False
-    iodir: Path = "./input/"
-    output_dir: Path = None
+    iodir: Path = Path("./input/")
+    output_dir: Optional[Path] = None
 
-def get_args():
-    args = Args().parse_args()
 
-    args.iodir = args.iodir.resolve()
-    print("IO Directory:", args.iodir)
-    if args.debug:
-        args.output_dir = Path(f"./output_{NETID}_debug").resolve()
-    else:
-        args.output_dir = Path(f"./output_{NETID}").resolve()
+def get_args() -> Args:
+    """Parse command-line flags and prepare IO locations.
 
-    args.output_dir.mkdir(parents=True, exist_ok=True)
-    print("Output Directory:", args.output_dir)
+    Returns an instance of `Args` with absolute paths and an ensured
+    output directory. The filesystem layout and folder names are preserved.
+    """
+    parser = argparse.ArgumentParser()
+    parser.add_argument("--debug", action="store_true", help="Enable debug mode")
+    parser.add_argument("--iodir", type=Path, default=Path("./input/"), help="Input directory")
+    ns = parser.parse_args()
 
-    return args
+    cfg = Args(debug=ns.debug, iodir=ns.iodir)
+
+    # Normalize input directory first
+    cfg.iodir = cfg.iodir.resolve()
+    print("IO dir ->", cfg.iodir)
+
+    # Decide output directory based on debug flag (names unchanged)
+    base = f"./output_{NETID}_debug" if cfg.debug else f"./output_{NETID}"
+    cfg.output_dir = Path(base).resolve()
+
+    # Ensure destination exists
+    cfg.output_dir.mkdir(parents=True, exist_ok=True)
+    print("Output dir ->", cfg.output_dir)
+
+    return cfg
